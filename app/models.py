@@ -2,6 +2,7 @@ from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, String, text
 from .database import Base
 
 
+# Responsible for creating the table in the database
 class Post(Base):
     __tablename__ = 'posts'
 

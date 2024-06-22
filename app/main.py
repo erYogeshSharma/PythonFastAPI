@@ -1,15 +1,7 @@
-import string
-import time
-from turtle import pu
-from typing import Optional
-from fastapi import Depends, FastAPI, Response, status, HTTPException
-from fastapi.params import Body
-from httpx import delete
-from pydantic import BaseModel
-from random import randrange
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from . import models
+
+from typing import List
+from fastapi import Depends, FastAPI,  status, HTTPException
+from . import models, schemas
 from .database import engine, get_db
 from sqlalchemy.orm import Session
 
@@ -18,42 +10,34 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Dependency for database session
+
+# while True:
+#     try:
+#         conn = psycopg2.connect(host="localhost", database="fastapi",
+#                                 user="postgres", password='yogesh084', cursor_factory=RealDictCursor)
+#         cursor = conn.cursor()
+#         print('Database connection was successful!')
+#         break
+#     except Exception as e:
+#         print('Database connection was unsuccessful!')
+#         print("error", e)
+#         time.sleep(2)
+
+# my_posts = [{'title': 'Post 1', 'content': 'This is a post', 'id': 1},
+#             {'title': 'Post 2', 'content': 'This is another post', 'id': 2}]
 
 
-while True:
-    try:
-        conn = psycopg2.connect(host="localhost", database="fastapi",
-                                user="postgres", password='yogesh084', cursor_factory=RealDictCursor)
-        cursor = conn.cursor()
-        print('Database connection was successful!')
-        break
-    except Exception as e:
-        print('Database connection was unsuccessful!')
-        print("error", e)
-        time.sleep(2)
-
-my_posts = [{'title': 'Post 1', 'content': 'This is a post', 'id': 1},
-            {'title': 'Post 2', 'content': 'This is another post', 'id': 2}]
-
-
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool = True  # Default value
-
-
-@app.get('/posts')  # Decorator
+@app.get('/posts', response_model=List[schemas.Post])  # Decorator
 # Name these function as descriptive as possible
 async def root(db: Session = Depends(get_db)):
     # cursor.execute("""SELECT * FROM posts""")
     # posts = cursor.fetchall()
     posts = db.query(models.Post).all()
-    return {'data': posts}
+    return posts
 
 
-@app.post('/createposts', status_code=status.HTTP_201_CREATED)
-def create_post(post: Post, db: Session = Depends(get_db)):
+@app.post('/createposts', status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
+def create_post(post: schemas.PostCreate, db: Session = Depends(get_db)):
     # cursor.execute("""INSERT INTO posts(title, content,published) VALUES(%s,%s,%s) RETURNING *""",
     #                (post.title, post.content, post.published))
     # new_post = cursor.fetchone()
@@ -64,9 +48,7 @@ def create_post(post: Post, db: Session = Depends(get_db)):
     db.add(new_post)     # add the new post to the database
     db.commit()          # commit the changes to db
     db.refresh(new_post)  # retrieve the newly created post from the database
-    return {
-        'data': new_post
-    }
+    return new_post
 
 
 @app.get('/posts/{id}')
@@ -79,9 +61,7 @@ def get_post(id: int, db: Session = Depends(get_db)):  # automatically converts 
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Post with id ' + str(id) + ' not found')
-    return {
-        'data': post
-    }
+    return post
 
 
 @app.delete('/posts/{id}', status_code=status.HTTP_204_NO_CONTENT)
@@ -101,8 +81,8 @@ def delete_post(id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
-@ app.put('/posts/{id}')
-def update_post(id: int, update_post: Post, db: Session = Depends(get_db)):
+@ app.put('/posts/{id}', response_model=schemas.Post)
+def update_post(id: int, update_post: schemas.PostCreate, db: Session = Depends(get_db)):
 
     # cursor.execute("""UPDATE posts SET title = %s, content = %s, published = %s WHERE id = %s RETURNING *""",
     #                (post.title, post.content, post.published, str(id)))
@@ -118,4 +98,4 @@ def update_post(id: int, update_post: Post, db: Session = Depends(get_db)):
 
     post_query.update(update_post.model_dump(), synchronize_session=False)
     db.commit()
-    return {'data': post_query.first()}
+    return post_query.first()
